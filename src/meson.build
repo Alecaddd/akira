@@ -153,5 +153,6 @@ executable(
     'Main.vala',
     asresources,
     dependencies: deps + [akira_dep],
-    install: true
+    install: true,
+    win_subsystem: 'windows'
 )
