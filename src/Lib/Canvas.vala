@@ -129,7 +129,7 @@ public class Akira.Lib.Canvas : Goo.Canvas {
         }
 
         Gtk.drag_finish (drag_context, true, false, time);
-
+        mode_manager.deregister_mode (Modes.InteractionMode.ModeType.ITEM_INSERT);
         update_canvas ();
     }
 
@@ -267,6 +267,11 @@ public class Akira.Lib.Canvas : Goo.Canvas {
         event.y = event.y / current_scale;
 
         hover_manager.remove_hover_effect ();
+
+        if (event.type == Gdk.EventType.@2BUTTON_PRESS) {
+            var new_mode = new Akira.Lib.Modes.EditMode (this, mode_manager);
+            mode_manager.register_mode (new_mode);
+        }
 
         if (mode_manager.button_press_event (event)) {
             return true;
