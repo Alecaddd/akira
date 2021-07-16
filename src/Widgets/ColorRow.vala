@@ -33,6 +33,7 @@ public class Akira.Widgets.ColorRow : Gtk.Grid {
     private Gtk.FlowBox global_colors_flowbox;
     private ColorField field;
     private InputField opacity_field;
+    private ColorMode color_mode_widget;
 
     /*
      * If the color or alpha are manually set from the ColorPicker.
@@ -78,6 +79,8 @@ public class Akira.Widgets.ColorRow : Gtk.Grid {
         color_popover = new Gtk.Popover (color_button);
         color_popover.position = Gtk.PositionType.BOTTOM;
 
+        color_mode_widget = new ColorMode (model, this.window);
+
         color_button.clicked.connect (() => {
             init_color_chooser ();
             color_popover.popup ();
@@ -104,6 +107,7 @@ public class Akira.Widgets.ColorRow : Gtk.Grid {
         field = new ColorField (window);
         field.text = Utils.Color.rgba_to_hex (model.color);
         field.changed.connect (() => {
+
             // Don't do anything if the color change came from the chooser.
             if (color_set_manually) {
                 return;
@@ -119,8 +123,13 @@ public class Akira.Widgets.ColorRow : Gtk.Grid {
             color_set_manually = true;
 
             var new_rgba = Utils.Color.hex_to_rgba (field_hex);
-            model.color = new_rgba.to_string ();
+
             set_button_color (field_hex, model.alpha);
+            window.event_bus.color_changed (new_rgba.to_string (), model.alpha / 255.0);
+
+            if (color_mode_widget.color_mode_type == "solid") {
+                model.color = new_rgba.to_string ();
+            }
 
             // Update the chooser widget only if it was already initialized.
             if (color_chooser_widget != null) {
@@ -129,6 +138,7 @@ public class Akira.Widgets.ColorRow : Gtk.Grid {
 
             // Reset the bool to allow edits from the color chooser.
             color_set_manually = false;
+
         });
 
         add (field);
@@ -145,16 +155,27 @@ public class Akira.Widgets.ColorRow : Gtk.Grid {
                     return;
                 }
 
+                // we need to get the RGBA value from field to trigger color_changed signal
+                var field_hex = field.text;
+                // Interrupt if what's written is not a valid color value.
+                if (!Utils.Color.is_valid_hex (field_hex)) {
+                    return;
+                }
+
+                var new_rgba = Utils.Color.hex_to_rgba (field_hex);
+
                 // Since we will update the color picker, prevent an infinite loop.
                 color_set_manually = true;
 
                 var alpha = (int) ((double) opacity_field.entry.value / 100 * 255);
-                model.alpha = alpha;
+                //model.alpha = alpha;
                 set_button_color (model.color, alpha);
+
+                window.event_bus.color_changed (new_rgba.to_string (), alpha);
 
                 // Update the chooser widget only if it was already initialized.
                 if (color_chooser_widget != null) {
-                    set_chooser_color (model.color, alpha);
+                    set_chooser_color (field.text, alpha);
                 }
 
                 // Reset the bool to allow edits from the color chooser.
@@ -214,16 +235,24 @@ public class Akira.Widgets.ColorRow : Gtk.Grid {
             global_colors_flowbox.add (btn);
         }
 
-        color_grid.attach (color_chooser_widget, 0, 0, 1, 1);
-        color_grid.attach (global_colors_label, 0, 1, 1, 1);
-        color_grid.attach (global_colors_flowbox, 0, 2, 1, 1);
+        color_grid.attach (color_mode_widget.buttons_grid, 0, 0, 1, 1);
+        color_grid.attach (color_chooser_widget, 0, 1, 1, 1);
+        color_grid.attach (global_colors_label, 0, 2, 1, 1);
+        color_grid.attach (global_colors_flowbox, 0, 3, 1, 1);
         color_grid.show_all ();
         color_popover.add (color_grid);
 
         // Set the chooser color before connecting the signal.
         set_chooser_color (model.color, model.alpha);
 
-        color_chooser_widget.notify["rgba"].connect (on_color_changed);
+        window.event_bus.color_mode_changed(model.color_mode);
+
+        color_chooser_widget.notify["rgba"].connect (() => {
+            string new_color = color_chooser_widget.rgba.to_string ();
+            double alpha = color_chooser_widget.rgba.alpha;
+
+            window.event_bus.color_changed (new_color, alpha);
+        });
     }
 
     private int sort_colors_function (Gtk.FlowBoxChild a, Gtk.FlowBoxChild b) {
@@ -272,6 +301,7 @@ public class Akira.Widgets.ColorRow : Gtk.Grid {
             new_rgba.alpha = (double) alpha / 255;
             var new_color = new_rgba.to_string ();
 
+            // TODO: when in gradient mode, add css_style from gradient editor here
             var css = """.selected-color {
                     background-color: %s;
                     border-color: shade (%s, 0.75);
@@ -301,31 +331,6 @@ public class Akira.Widgets.ColorRow : Gtk.Grid {
         return child;
     }
 
-    private void on_color_changed () {
-        // The color change came from the input field, prevent an infinite loop.
-        if (color_set_manually) {
-            return;
-        }
-
-        // Prevent visible updated fields like hex and opacity from triggering
-        // the update of the model values.
-        color_set_manually = true;
-
-        // Update the model values.
-        model.color = color_chooser_widget.rgba.to_string ();
-        model.alpha = (int) (color_chooser_widget.rgba.alpha * 255);
-
-        // Update the UI.
-        set_button_color (model.color, model.alpha);
-        field.text = Utils.Color.rgba_to_hex (model.color);
-        if (model.type == Models.ColorModel.Type.FILL) {
-            opacity_field.entry.value = Math.round ((double) model.alpha / 255 * 100);
-        }
-
-        // Allow manual edit from the input fields.
-        color_set_manually = false;
-    }
-
     private void on_eyedropper_click () {
         var eyedropper = new Akira.Utils.ColorPicker ();
         eyedropper.show_all ();
@@ -340,4 +345,5 @@ public class Akira.Widgets.ColorRow : Gtk.Grid {
             eyedropper.close ();
         });
     }
+
 }

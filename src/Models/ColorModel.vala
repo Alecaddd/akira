@@ -33,6 +33,28 @@ public class Akira.Models.ColorModel : GLib.Object {
         BORDER
     }
 
+    public string color_mode {
+        get {
+            return type == Type.FILL ? fill.color_mode : "solid";
+        }
+        set {
+            if(type == Type.FILL) {
+                fill.color_mode = value;
+            }
+        }
+    }
+
+    public Cairo.Pattern pattern {
+            owned get {
+                return type == Type.FILL ? fill.gradient_pattern : new Cairo.Pattern.linear(0,0,0,0);
+            }
+            set {
+                if (type == Type.FILL) {
+                    fill.set("gradient-pattern", value);
+                }
+            }
+    }
+
     public string color {
         owned get {
             return type == Type.FILL ? fill.color.to_string () : border.color.to_string ();
@@ -81,6 +103,22 @@ public class Akira.Models.ColorModel : GLib.Object {
         }
         set {
             border.size = value;
+        }
+    }
+
+    public double width {
+        get {
+            double width;
+            fill.item.size.get ("width", out width);
+            return width;
+        }
+    }
+
+    public double height {
+        get {
+            double height;
+            fill.item.get ("height", out height);
+            return height;
         }
     }
 
